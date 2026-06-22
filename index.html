@@ -1,77 +1,381 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>OnePrep-Style Question Bank</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OnePrep - CollegeBoard Practice Port</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+            --border: #e5e7eb;
+            --success: #10b981;
+            --error: #ef4444;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        h1, h2, h3 { color: var(--primary); }
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background-color 0.2s;
+            margin-top: 10px;
+        }
+        button:hover { background-color: var(--primary-hover); }
+        select, input {
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 16px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .option-label {
+            display: block;
+            padding: 15px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .option-label:hover { border-color: var(--primary); }
+        input[type="radio"] { display: none; }
+        input[type="radio"]:checked + .option-text {
+            font-weight: bold;
+            color: var(--primary);
+        }
+        input[type="radio"]:checked ~ .option-label {
+            border-color: var(--primary);
+            background-color: #eff6ff;
+        }
+        .review-card {
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .correct { border-left: 5px solid var(--success); }
+        .incorrect { border-left: 5px solid var(--error); }
+        #chart-container { margin-top: 30px; }
+    </style>
 </head>
 <body>
-  <div id="app">
-    <!-- Lobby Screen -->
-    <section id="lobby-screen" class="screen active">
-      <h1>English Question Practice</h1>
-      <p class="subtitle">Custom interface for College-style question bank practice.</p>
 
-      <div class="card">
-        <h2>Choose Topic</h2>
+<div class="container">
+    <div id="lobby-screen" class="screen active">
+        <h1>OnePrep Emulator</h1>
+        <p>A private, modernized UI for your CollegeBoard question bank.</p>
+        <p>Make sure <strong>questionbank.pdf</strong> is uploaded to the same repository folder.</p>
+        <button onclick="loadDatabase()">Load Database</button>
+    </div>
+
+    <div id="loading-screen" class="screen">
+        <h2>Parsing Database...</h2>
+        <p>Reading the PDF and extracting English questions. This may take a minute depending on the PDF size.</p>
+        <div id="loading-progress">Initializing...</div>
+    </div>
+
+    <div id="setup-screen" class="screen">
+        <h2>Practice Setup</h2>
+        <label>Select Domain / Topic:</label>
         <select id="topic-select">
-          <option value="all">All Topics</option>
-          <!-- Add more topics as needed; must match topics in questions data -->
-          <option value="Rhetoric">Rhetoric</option>
-          <option value="Grammar">Grammar</option>
-          <option value="Reading">Reading</option>
+            <option value="all">All English Topics</option>
         </select>
-      </div>
+        
+        <label>Number of Questions:</label>
+        <input type="number" id="question-count" value="10" min="1" max="50">
+        
+        <button onclick="startQuiz()">Start Practice</button>
+    </div>
 
-      <div class="card">
-        <h2>Number of Questions</h2>
-        <input id="question-count" type="number" min="1" max="50" value="5" />
-        <small>Adjust based on how many you want per session.</small>
-      </div>
+    <div id="quiz-screen" class="screen">
+        <h2 id="quiz-progress">Question 1</h2>
+        <span id="quiz-topic" style="color: gray; font-size: 14px;"></span>
+        <p id="question-text" style="font-size: 18px; line-height: 1.6;"></p>
+        
+        <div id="options-container"></div>
+        
+        <button onclick="nextQuestion()" id="next-btn">Next Question</button>
+    </div>
 
-      <div class="card">
-        <h2>Session Stats</h2>
-        <div id="stats-summary">
-          <p><strong>Total Questions Answered:</strong> <span id="stat-total">0</span></p>
-          <p><strong>Total Correct:</strong> <span id="stat-correct">0</span></p>
-          <p><strong>Accuracy:</strong> <span id="stat-accuracy">0%</span></p>
+    <div id="results-screen" class="screen">
+        <h2>Practice Complete!</h2>
+        <h3 id="final-score"></h3>
+        
+        <div id="chart-container">
+            <canvas id="resultsChart"></canvas>
         </div>
-        <canvas id="topic-bar-chart" width="400" height="200"></canvas>
-        <small>Bar graph shows accuracy by topic across all sessions.</small>
-      </div>
 
-      <button id="start-btn" class="primary-btn">Start Practice</button>
-    </section>
+        <h3 style="margin-top: 40px;">Review & Explanations</h3>
+        <div id="review-container"></div>
+        
+        <button onclick="showScreen('setup-screen')">Start New Practice</button>
+    </div>
+</div>
 
-    <!-- Practice Screen -->
-    <section id="practice-screen" class="screen">
-      <div class="practice-header">
-        <button id="back-to-lobby" class="secondary-btn">← Back</button>
-        <div class="practice-info">
-          <span id="practice-topic-label"></span>
-          <span id="practice-progress"></span>
-        </div>
-      </div>
+<script>
+    // Configure PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-      <div id="question-container" class="card">
-        <h2 id="question-text"></h2>
-        <ul id="answer-choices"></ul>
-      </div>
+    let allQuestions = [];
+    let currentQuiz = [];
+    let currentIndex = 0;
+    let userAnswers = [];
 
-      <div id="feedback-container" class="card hidden">
-        <p id="feedback-result"></p>
-        <p id="feedback-explanation"></p>
-      </div>
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+    }
 
-      <div class="practice-controls">
-        <button id="submit-answer" class="primary-btn">Submit</button>
-        <button id="next-question" class="secondary-btn" disabled>Next</button>
-      </div>
-    </section>
-  </div>
+    // 1. Parse the PDF File
+    async function loadDatabase() {
+        showScreen('loading-screen');
+        try {
+            // Note: Change 'questionbank.pdf' if your file has a different name
+            const pdf = await pdfjsLib.getDocument('questionbank.pdf').promise;
+            let fullText = "";
+            const progress = document.getElementById('loading-progress');
+            
+            // Extract text from all pages
+            for (let i = 1; i <= pdf.numPages; i++) {
+                progress.innerText = `Extracting page ${i} of ${pdf.numPages}...`;
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                const pageStrings = content.items.map(item => item.str);
+                fullText += pageStrings.join(" ") + " \n";
+            }
 
-  <!-- Simple chart using vanilla canvas (no external libs) -->
-  <script src="script.js"></script>
+            progress.innerText = "Structuring data...";
+            parseQuestions(fullText);
+            populateSetup();
+            showScreen('setup-screen');
+            
+        } catch (error) {
+            console.error(error);
+            alert("Error loading PDF. Ensure 'questionbank.pdf' is in the exact same folder and the site is hosted (GitHub pages).");
+            showScreen('lobby-screen');
+        }
+    }
+
+    // 2. Extract Questions using Regex
+    function parseQuestions(text) {
+        // Splitting by Question ID to isolate each block
+        const blocks = text.split(/Question ID:\s*/i).slice(1);
+        
+        blocks.forEach(block => {
+            try {
+                // Focus on Reading and Writing (English)
+                if(!block.includes("Reading and Writing")) return;
+
+                // Extract Metadata (Domain, Skill)
+                const domainMatch = block.match(/Reading and Writing\s+(.*?)\s+(.*?)\s+(Hard|Medium|Easy)/);
+                const domain = domainMatch ? domainMatch[1].trim() : "General English";
+
+                // Extract Question Body
+                const qStart = block.indexOf("Question") + 8;
+                const qEnd = block.indexOf("Answer", qStart);
+                const questionText = block.substring(qStart, qEnd).trim();
+
+                // Extract Options
+                const optA = block.match(/A\.\s+(.*?)(?=\s+B\.)/s)?.[1]?.trim() || "";
+                const optB = block.match(/B\.\s+(.*?)(?=\s+C\.)/s)?.[1]?.trim() || "";
+                const optC = block.match(/C\.\s+(.*?)(?=\s+D\.)/s)?.[1]?.trim() || "";
+                const optD = block.match(/D\.\s+(.*?)(?=\s+Correct Answer:)/s)?.[1]?.trim() || "";
+
+                // Extract Correct Answer & Rationale
+                const correctMatch = block.match(/Correct Answer:\s*([A-D])/);
+                const correctAnswer = correctMatch ? correctMatch[1] : "";
+                
+                const rationaleStart = block.indexOf("Rationale");
+                const rationale = rationaleStart !== -1 ? block.substring(rationaleStart + 9).trim() : "No explanation provided.";
+
+                if(questionText && optA && correctAnswer) {
+                    allQuestions.push({
+                        domain,
+                        question: questionText,
+                        options: { A: optA, B: optB, C: optC, D: optD },
+                        correctAnswer,
+                        rationale
+                    });
+                }
+            } catch (e) {
+                console.warn("Skipped a malformed question block");
+            }
+        });
+        console.log(`Parsed ${allQuestions.length} English questions.`);
+    }
+
+    function populateSetup() {
+        const topics = [...new Set(allQuestions.map(q => q.domain))];
+        const select = document.getElementById('topic-select');
+        topics.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.innerText = t;
+            select.appendChild(opt);
+        });
+    }
+
+    // 3. Quiz Logic
+    function startQuiz() {
+        const topic = document.getElementById('topic-select').value;
+        const count = parseInt(document.getElementById('question-count').value);
+        
+        let filtered = topic === 'all' ? allQuestions : allQuestions.filter(q => q.domain === topic);
+        
+        // Shuffle and pick
+        filtered.sort(() => 0.5 - Math.random());
+        currentQuiz = filtered.slice(0, Math.min(count, filtered.length));
+        
+        if(currentQuiz.length === 0) {
+            alert("No questions found for this topic!");
+            return;
+        }
+
+        currentIndex = 0;
+        userAnswers = [];
+        showScreen('quiz-screen');
+        renderQuestion();
+    }
+
+    function renderQuestion() {
+        const q = currentQuiz[currentIndex];
+        document.getElementById('quiz-progress').innerText = `Question ${currentIndex + 1} of ${currentQuiz.length}`;
+        document.getElementById('quiz-topic').innerText = `Topic: ${q.domain}`;
+        document.getElementById('question-text').innerText = q.question;
+        
+        const container = document.getElementById('options-container');
+        container.innerHTML = "";
+        
+        ['A', 'B', 'C', 'D'].forEach(letter => {
+            if(!q.options[letter]) return;
+            const label = document.createElement('label');
+            label.className = 'option-label';
+            label.innerHTML = `
+                <input type="radio" name="q-option" value="${letter}">
+                <span class="option-text">${letter}. ${q.options[letter]}</span>
+            `;
+            container.appendChild(label);
+        });
+
+        document.getElementById('next-btn').innerText = (currentIndex === currentQuiz.length - 1) ? "Submit Quiz" : "Next Question";
+    }
+
+    function nextQuestion() {
+        const selected = document.querySelector('input[name="q-option"]:checked');
+        if(!selected) {
+            alert("Please select an answer!");
+            return;
+        }
+
+        userAnswers.push({
+            questionObj: currentQuiz[currentIndex],
+            selected: selected.value,
+            isCorrect: selected.value === currentQuiz[currentIndex].correctAnswer
+        });
+
+        if (currentIndex < currentQuiz.length - 1) {
+            currentIndex++;
+            renderQuestion();
+        } else {
+            showResults();
+        }
+    }
+
+    // 4. Analytics & Results
+    function showResults() {
+        showScreen('results-screen');
+        const correctCount = userAnswers.filter(a => a.isCorrect).length;
+        document.getElementById('final-score').innerText = `Score: ${correctCount} / ${currentQuiz.length} (${Math.round(correctCount/currentQuiz.length*100)}%)`;
+
+        renderGraph();
+        renderReview();
+    }
+
+    function renderGraph() {
+        // Group data by domain
+        const domainStats = {};
+        userAnswers.forEach(ans => {
+            const dom = ans.questionObj.domain;
+            if(!domainStats[dom]) domainStats[dom] = { correct: 0, total: 0 };
+            domainStats[dom].total++;
+            if(ans.isCorrect) domainStats[dom].correct++;
+        });
+
+        const labels = Object.keys(domainStats);
+        const percentages = labels.map(l => (domainStats[l].correct / domainStats[l].total) * 100);
+
+        const ctx = document.getElementById('resultsChart').getContext('2d');
+        
+        // Destroy existing chart if repeating quiz
+        if(window.myChart) window.myChart.destroy();
+
+        window.myChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Accuracy by Topic (%)',
+                    data: percentages,
+                    backgroundColor: 'rgba(37, 99, 235, 0.6)',
+                    borderColor: 'rgba(37, 99, 235, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: { y: { beginAtZero: true, max: 100 } }
+            }
+        });
+    }
+
+    function renderReview() {
+        const container = document.getElementById('review-container');
+        container.innerHTML = "";
+
+        userAnswers.forEach((ans, i) => {
+            const div = document.createElement('div');
+            div.className = `review-card ${ans.isCorrect ? 'correct' : 'incorrect'}`;
+            div.innerHTML = `
+                <h4>Question ${i + 1}</h4>
+                <p><strong>${ans.questionObj.question}</strong></p>
+                <p>Your Answer: ${ans.selected} | Correct Answer: ${ans.questionObj.correctAnswer}</p>
+                <div style="background: #f8fafc; padding: 10px; border-radius: 4px; margin-top: 10px;">
+                    <strong>Explanation:</strong><br>
+                    ${ans.questionObj.rationale}
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    }
+</script>
 </body>
 </html>
