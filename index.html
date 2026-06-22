@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>OnePrep-Style Question Bank</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Lobby Screen -->
+    <section id="lobby-screen" class="screen active">
+      <h1>English Question Practice</h1>
+      <p class="subtitle">Custom interface for College-style question bank practice.</p>
+
+      <div class="card">
+        <h2>Choose Topic</h2>
+        <select id="topic-select">
+          <option value="all">All Topics</option>
+          <!-- Add more topics as needed; must match topics in questions data -->
+          <option value="Rhetoric">Rhetoric</option>
+          <option value="Grammar">Grammar</option>
+          <option value="Reading">Reading</option>
+        </select>
+      </div>
+
+      <div class="card">
+        <h2>Number of Questions</h2>
+        <input id="question-count" type="number" min="1" max="50" value="5" />
+        <small>Adjust based on how many you want per session.</small>
+      </div>
+
+      <div class="card">
+        <h2>Session Stats</h2>
+        <div id="stats-summary">
+          <p><strong>Total Questions Answered:</strong> <span id="stat-total">0</span></p>
+          <p><strong>Total Correct:</strong> <span id="stat-correct">0</span></p>
+          <p><strong>Accuracy:</strong> <span id="stat-accuracy">0%</span></p>
+        </div>
+        <canvas id="topic-bar-chart" width="400" height="200"></canvas>
+        <small>Bar graph shows accuracy by topic across all sessions.</small>
+      </div>
+
+      <button id="start-btn" class="primary-btn">Start Practice</button>
+    </section>
+
+    <!-- Practice Screen -->
+    <section id="practice-screen" class="screen">
+      <div class="practice-header">
+        <button id="back-to-lobby" class="secondary-btn">← Back</button>
+        <div class="practice-info">
+          <span id="practice-topic-label"></span>
+          <span id="practice-progress"></span>
+        </div>
+      </div>
+
+      <div id="question-container" class="card">
+        <h2 id="question-text"></h2>
+        <ul id="answer-choices"></ul>
+      </div>
+
+      <div id="feedback-container" class="card hidden">
+        <p id="feedback-result"></p>
+        <p id="feedback-explanation"></p>
+      </div>
+
+      <div class="practice-controls">
+        <button id="submit-answer" class="primary-btn">Submit</button>
+        <button id="next-question" class="secondary-btn" disabled>Next</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- Simple chart using vanilla canvas (no external libs) -->
+  <script src="script.js"></script>
+</body>
+</html>
